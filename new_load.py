@@ -5,6 +5,7 @@ LastEditors: Eurekwah
 LastEditTime: 2021-02-21 21:18:27
 FilePath: /ddpg/new_load.py
 '''
+import math
 
 
 class Load:
@@ -12,29 +13,32 @@ class Load:
         self.list = [11, 22, 64, 148, 192, 223, 173, 101, 43, 21, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
         self.wait_num = 0
         self.load = [0 for i in range(24)]
-        self.price = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.8, 0.8, 1.2, 1.2, 1.2, 1.2, 0.8, 0.8, 0.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.8, 0.8]
+        # self.price = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.8, 0.8, 1.2, 1.2, 1.2, 1.2, 0.8, 0.8, 0.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.8, 0.8]
+        self.price = [1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2]
 
     def step(self, action, time):
-        #print(action)
-        decount = action
-        self.wait_num += self.list[time]
-        if decount < 0:
-            length = int(-decount * self.wait_num)
+        r = (action + 1) / 2
+        s_0 = 1
+        k = 1
+        if r < math.exp(-s_0 / k):
+            tau = 0
         else:
-            length = int(1 - decount * self.wait_num)
-
+            tau = (k * math.log(r) + s_0) / s_0
+        length = int(tau * self.wait_num + (1 - tau) * self.list[time])
+        self.wait_num += self.list[time]
         for i in range(length):
-            self.load[time] += 5
-            self.load[(time + 1) % 24] += 5
+            if time != 23:
+                self.load[time] += 5
+                self.load[time + 1] += 5
+            else:
+                self.load[time] += 10
             self.wait_num -= 1
-        # true_price = decount / 2 + self.price[time]
         crt_load = self.load[time]
         self.load[time] = 0
-        profit = crt_load * decount 
+        profit = crt_load * r * self.price[time] 
         if time == 23:
-            profit -= 1 * sum(self.load)
-            crt_load += sum(self.load)
-        return crt_load , profit
+            profit -= 5 * self.wait_num
+        return crt_load , profit, (1 - r) * self.price[time]
 
     def reset(self):
         self.wait_num = 0

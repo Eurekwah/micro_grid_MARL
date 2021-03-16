@@ -2,7 +2,7 @@
 #PBS -N micro_grid
 #PBS -l nodes=1:ppn=20
 #PBS -l walltime=88888:00:00
-#PBS -q adf
+#PBS -q abn
 #PBS -j oe
 #PBS -m ae
 #PBS -M 741340882@qq.com

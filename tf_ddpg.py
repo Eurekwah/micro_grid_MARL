@@ -2,8 +2,8 @@
 Auther: Eurekwah
 Date: 1970-01-01 08:00:00
 LastEditors: Eurekwah
-LastEditTime: 2021-02-23 19:50:32
-FilePath: /micro_grid/ddpg/tf_ddpg.py
+LastEditTime: 2021-03-09 03:50:31
+FilePath: /code/tf_ddpg.py
 '''
 import numpy as np
 import tensorflow.compat.v1 as tf
@@ -26,13 +26,13 @@ tf.set_random_seed(1)
 #####################  hyper parameters  ####################
 
 STATE_DIM  = 4
-ACTION_DIM = 2
+ACTION_DIM = 3
 
 ab=1 # action boundary
 
-LR_A = 1e-4    # learning rate for actor
-LR_C = 1e-4   # learning rate for critic
-GAMMA = 0.99     # reward discount
+LR_A = 1e-5    # learning rate for actor
+LR_C = 1e-5   # learning rate for critic
+GAMMA = 0.3     # reward discount
 
 
 REPLACEMENT = [
@@ -40,7 +40,7 @@ REPLACEMENT = [
     dict(name='hard', rep_iter_a=600, rep_iter_c=500)
 ][0]            # you can try different target replacement strategies origin set: 600,500
 MEMORY_CAPACITY = 15000
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 
 RENDER = False
 OUTPUT_GRAPH = True
@@ -77,7 +77,7 @@ class Actor(object):
 
     def _build_net(self, s, scope, trainable):
         with tf.variable_scope(scope):
-            init_w = tf.random_normal_initializer(0., 0.5)
+            init_w = tf.random_normal_initializer(0., 1)
             #init_b = tf.constant_initializer(0.1)
             init_b = tf.constant_initializer(0)
             net1 = tf.layers.dense(s, 64, activation=tf.nn.relu,
@@ -197,16 +197,10 @@ class Memory(object):
         self.capacity = capacity
         self.data = np.zeros((capacity, dims))
         self.pointer = 0
-        self.dt = np.dtype([('index', int), ('reward', float)])
-        self.stack = np.zeros((capacity, 1), dtype=self.dt)
 
     def store_transition(self, s, a, r, s_):
         transition = np.hstack((s, a, [r], s_))
-        if self.pointer < self.capacity:
-            index = self.pointer  # replace the old memory with new memory
-        else:
-            index = np.argmin(self.stack[:]['reward'])
-        self.stack[index] = np.array([(index, r)], dtype=self.dt)
+        index = self.pointer % self.capacity  # replace the old memory with new memory
         self.data[index, :] = transition
         self.pointer += 1
 
@@ -214,7 +208,33 @@ class Memory(object):
         assert self.pointer >= self.capacity, 'Memory has not been fulfilled'
         indices = np.random.choice(self.capacity, size=n)
         return self.data[indices, :]
+'''
+class Memory(object):
+    def __init__(self, capacity, dims):
+        self.capacity = capacity
+        self.data = np.zeros((capacity, dims))
+        self.pointer = 0
+        self.dt = np.dtype([('index', int), ('reward', float)])
+        self.stack = np.zeros((capacity, 1), dtype=self.dt)
 
+    def store_transition(self, s, a, r, s_):
+        transition = np.hstack((s, a, [r], s_))
+        if self.pointer < self.capacity:
+            index = self.pointer  # replace the old memory with new memory
+            self.stack[index] = np.array([(index, r)], dtype=self.dt)
+            self.data[index, :] = transition
+        else:
+            index = np.argmin(self.stack[:]['reward'])
+            if r >= self.stack[index]['reward']:
+                self.stack[index] = np.array([(index, r)], dtype=self.dt)
+                self.data[index, :] = transition
+        self.pointer += 1
+
+    def sample(self, n):
+        assert self.pointer >= self.capacity, 'Memory has not been fulfilled'
+        indices = np.random.choice(self.capacity, size=n)
+        return self.data[indices, :]
+'''
 ####################  main  ######################
 with tf.name_scope('S'):
     S = tf.placeholder(tf.float32, shape=[None, STATE_DIM], name='s')
@@ -234,7 +254,7 @@ def train(action_bound, episodes):
     M = Memory(MEMORY_CAPACITY, dims=2 * STATE_DIM + ACTION_DIM + 1)
 
     environment = env.Env()
-    action_temp = []
+    reward_temp = []
     #plt.ion()
     var = 2
     
@@ -244,11 +264,19 @@ def train(action_bound, episodes):
 
         a0_stack = []
         a1_stack = []
+        a2_stack = []
+        ev_stack = []
+        price_stack = []
+        reward_stack = []
+
+        state_stack = []
         for time in range(24):
             a = actor.choose_action(s)
             a = np.clip(np.random.normal(a, var), -1, 1)
             s1, r1 = environment.step(time, a)
             M.store_transition(s, a, r1, s1)
+            s = s1
+            reward_stack.append(r1)
             if M.pointer > MEMORY_CAPACITY:
                 var *=0.9995
                 b_M = M.sample(BATCH_SIZE)
@@ -258,22 +286,38 @@ def train(action_bound, episodes):
                 b_s_ = b_M[:, -STATE_DIM:]
                 a0_stack.append(a[0])
                 a1_stack.append(a[1])
+                a2_stack.append(a[2])
+                ev_stack.append(s[0])
+                state_stack.append(s[3])
                 critic.learn(b_s, b_a, b_r, b_s_)
                 actor.learn(b_s)
             episode_reward += r1
-        if M.pointer > MEMORY_CAPACITY:
-            action_temp.append(episode_reward)
-            print(i, ': ', episode_reward, 'exploration:', var)
-            plt.clf()
-            plt.subplot(211)
-            plt.plot(action_temp)
-            plt.subplot(212)
-            # plt.ylim(-1, 1)
-            plt.plot(a0_stack)
-            plt.plot(a1_stack)
+        #if M.pointer > MEMORY_CAPACITY:
+        reward_temp.append(episode_reward)
+        print(i, ': ', episode_reward, 'exploration:', var)
+        plt.clf()
+        plt.subplot(321)
+        plt.plot(reward_temp)
+        plt.subplot(322)
+        # plt.ylim(-1, 1)
+        plt.plot(a0_stack, label='Price subsidy')
+        plt.plot(a1_stack, label='Energy storage unit power')
+        plt.plot(a2_stack, label='Diesel power')
+        plt.legend()
+        plt.subplot(323)
+        plt.plot([55, 165, 430, 1060, 1700, 2075, 1980, 1370, 720, 320, 105, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10], label='origin')
+        plt.plot(ev_stack, label='with price subsidy')
+        plt.legend()
+        plt.subplot(324)
+        plt.plot(state_stack)
+        plt.subplot(325)
+        plt.plot(reward_stack)
+            #plt.subplot(326)
+            
+            #plt.pause(0.05)
     #plt.ioff()
     #plt.show()
-    plt.savefig('/public/home/zyc20000201/code/ddpg/figure6.png')
+    plt.savefig('/public/home/zyc20000201/code/ddpg/figure13.png')
 
 if __name__ == '__main__':
-    train([1, 1], 1500)
+    train([1, 1, 1], 2000)

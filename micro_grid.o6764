@@ -1,0 +1,19 @@
+2021-03-16 14:14:13.966471: I tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN)to use the following CPU instructions in performance-critical operations:  SSE4.1 SSE4.2 AVX AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2021-03-16 14:14:13.974627: I tensorflow/core/platform/profile_utils/cpu_utils.cc:104] CPU Frequency: 2294755000 Hz
+2021-03-16 14:14:13.975773: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5598f7da8810 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2021-03-16 14:14:13.975797: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+WARNING:tensorflow:From tf_ddpg.py:83: dense (from tensorflow.python.keras.legacy_tf_layers.core) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use keras.layers.Dense instead.
+WARNING:tensorflow:From /public/home/zyc20000201/miniconda3/lib/python3.8/site-packages/tensorflow/python/keras/legacy_tf_layers/core.py:187: Layer.apply (from tensorflow.python.keras.engine.base_layer_v1) is deprecated and will be removed in a future version.
+Instructions for updating:
+Please use `layer.__call__` method instead.
+Traceback (most recent call last):
+  File "tf_ddpg.py", line 323, in <module>
+    train([1, 1, 1], 2000)
+  File "tf_ddpg.py", line 277, in train
+    M.store_transition(s, a, r1, s1)
+  File "tf_ddpg.py", line 204, in store_transition
+    self.data[index, :] = transition
+ValueError: could not broadcast input array from shape (13) into shape (12)
