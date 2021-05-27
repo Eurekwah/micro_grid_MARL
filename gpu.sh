@@ -1,8 +1,8 @@
 #!/bin/bash
 #PBS -N micro_grid
-#PBS -l nodes=1:ppn=20
+#PBS -l nodes=1:ppn=1:gpus=4
 #PBS -l walltime=88888:00:00
-#PBS -q abn
+#PBS -q gpu
 #PBS -j oe
 #PBS -m ae
 #PBS -M 741340882@qq.com
@@ -37,7 +37,12 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
-conda activate base
+conda activate tf-gpu
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64
+
+export PATH=$PATH:/usr/local/cuda-9.0/bin
+
+export CUDA_HOME=$CUDA_HOME:/usr/local/cuda-9.0
 
 source /public/software/profile.d/mpi_mpich-intel-3.2.sh
 

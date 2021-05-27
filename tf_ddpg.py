@@ -5,20 +5,29 @@ LastEditors: Eurekwah
 LastEditTime: 2021-03-09 03:50:31
 FilePath: /code/tf_ddpg.py
 '''
+#coding=utf-8
 import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
+# import tensorflow.compat.v1 as tf
 import math
-#import tensorlayer as tl
+
+import matplotlib
+# import tensorlayer as tl
+
+
 import time
 import scipy
 from scipy.integrate import odeint
 import random
 import os
+import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import new_env as env
 
-tf.compat.v1.disable_eager_execution()
+
+# tf.compat.v1.disable_eager_execution()
+
 
 np.random.seed(1)
 tf.set_random_seed(1)
@@ -30,17 +39,18 @@ ACTION_DIM = 3
 
 ab=1 # action boundary
 
-LR_A = 1e-5    # learning rate for actor
+LR_A = 1e-5   # learning rate for actor
 LR_C = 1e-5   # learning rate for critic
-GAMMA = 0.3     # reward discount
+GAMMA = 0.99   # reward discount
 
+TIMES = 3
 
 REPLACEMENT = [
     dict(name='soft', tau=0.001),
-    dict(name='hard', rep_iter_a=600, rep_iter_c=500)
+    dict(name='hard', rep_iter_a=60, rep_iter_c=50)
 ][0]            # you can try different target replacement strategies origin set: 600,500
-MEMORY_CAPACITY = 15000
-BATCH_SIZE = 256
+MEMORY_CAPACITY = 20000
+BATCH_SIZE = 512
 
 RENDER = False
 OUTPUT_GRAPH = True
@@ -80,15 +90,15 @@ class Actor(object):
             init_w = tf.random_normal_initializer(0., 1)
             #init_b = tf.constant_initializer(0.1)
             init_b = tf.constant_initializer(0)
-            net1 = tf.layers.dense(s, 64, activation=tf.nn.relu,
+            net1 = tf.layers.dense(s, 64*TIMES, activation=tf.nn.sigmoid,
                                   kernel_initializer=init_w, bias_initializer=init_b, name='l1',
                                   trainable=trainable)
 
-            net2 = tf.layers.dense(net1, 128, activation=tf.nn.relu,
+            net2 = tf.layers.dense(net1, 128*TIMES, activation=tf.nn.sigmoid,
                                   kernel_initializer=init_w, bias_initializer=init_b, name='l2',
                                   trainable=trainable)
 
-            net3 = tf.layers.dense(net2, 64, activation=tf.nn.relu,
+            net3 = tf.layers.dense(net2, 64*TIMES, activation=tf.nn.sigmoid,
                                   kernel_initializer=init_w, bias_initializer=init_b, name='l3',
                                   trainable=trainable)
             with tf.variable_scope('a'):
@@ -254,70 +264,102 @@ def train(action_bound, episodes):
     M = Memory(MEMORY_CAPACITY, dims=2 * STATE_DIM + ACTION_DIM + 1)
 
     environment = env.Env()
-    reward_temp = []
-    #plt.ion()
-    var = 2
+    reward_temp = []    # 过程reward
+    a0_stack = []       # 储能装置功率
+    a1_stack = []       # 充电补贴
+    a2_stack = []       # 柴油机功率
+    ev_stack = []       # 充电补贴后负荷
+    pw_stack = []       # 输出电力
+    rw_stack = []       # 每小时reward
+    pc_stack = []       # 电价
+    wt_stack = []       # wait number
+    st_stack = []       # storage unit
+    var = 4
     
     for i in range(episodes):
         s = environment.reset()
-        episode_reward = 0
+        episode_reward = 0  # 每代reward
 
-        a0_stack = []
-        a1_stack = []
-        a2_stack = []
-        ev_stack = []
-        price_stack = []
-        reward_stack = []
-
-        state_stack = []
         for time in range(24):
             a = actor.choose_action(s)
             a = np.clip(np.random.normal(a, var), -1, 1)
-            s1, r1 = environment.step(time, a)
+            s1, r1, crt_price = environment.step(time, a)
             M.store_transition(s, a, r1, s1)
             s = s1
-            reward_stack.append(r1)
+            
             if M.pointer > MEMORY_CAPACITY:
-                var *=0.9995
+                var *= 0.999
                 b_M = M.sample(BATCH_SIZE)
                 b_s = b_M[:, :STATE_DIM]
                 b_a = b_M[:, STATE_DIM: STATE_DIM + ACTION_DIM]
                 b_r = b_M[:, -STATE_DIM - 1: -STATE_DIM]
                 b_s_ = b_M[:, -STATE_DIM:]
-                a0_stack.append(a[0])
-                a1_stack.append(a[1])
-                a2_stack.append(a[2])
-                ev_stack.append(s[0])
-                state_stack.append(s[3])
                 critic.learn(b_s, b_a, b_r, b_s_)
                 actor.learn(b_s)
-            episode_reward += r1
-        #if M.pointer > MEMORY_CAPACITY:
-        reward_temp.append(episode_reward)
-        print(i, ': ', episode_reward, 'exploration:', var)
-        plt.clf()
-        plt.subplot(321)
-        plt.plot(reward_temp)
-        plt.subplot(322)
-        # plt.ylim(-1, 1)
-        plt.plot(a0_stack, label='Price subsidy')
-        plt.plot(a1_stack, label='Energy storage unit power')
-        plt.plot(a2_stack, label='Diesel power')
-        plt.legend()
-        plt.subplot(323)
-        plt.plot([55, 165, 430, 1060, 1700, 2075, 1980, 1370, 720, 320, 105, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10], label='origin')
-        plt.plot(ev_stack, label='with price subsidy')
-        plt.legend()
-        plt.subplot(324)
-        plt.plot(state_stack)
-        plt.subplot(325)
-        plt.plot(reward_stack)
-            #plt.subplot(326)
+                if i == episodes - 1:
+                    a0_stack.append(a[0])
+                    a1_stack.append(a[1])
+                    a2_stack.append(a[2])
+                    ev_stack.append(s[0])
+                    pw_stack.append(s[1])
+                    pc_stack.append(crt_price)
+                    rw_stack.append(r1)
+                    st_stack.append(s[2])
+                    wt_stack.append(s[3])
             
-            #plt.pause(0.05)
-    #plt.ioff()
-    #plt.show()
-    plt.savefig('/public/home/zyc20000201/code/ddpg/figure13.png')
+        # print(episodes, ":", episode_reward)
+            episode_reward += r1
+        reward_temp.append(episode_reward)
+            
+        if i == episodes - 1:
+            fig = plt.figure(figsize=(16, 16), dpi=300)
+            a1 = plt.subplot2grid((4, 3), (0, 0))
+            a1.set_ylim([-1.5, 1.5])
+            a1.plot(a0_stack)
+            a1.set_title('storage unit power')
+            a2 = plt.subplot2grid((4, 3), (0, 1))
+            a2.set_ylim([-1.5, 1.5])
+            a2.plot(a1_stack)
+            a2.set_title('charging subsidies')
+            a3 = plt.subplot2grid((4, 3), (0, 2))
+            a3.set_ylim([-1.5, 1.5])
+            a3.plot(a2_stack)
+            a3.set_title('diesel engine power')
+            a4 = plt.subplot2grid((4, 3), (1, 0))
+            a4.plot(ev_stack, label='real')
+            a4.plot([105, 310, 865, 2150, 3580, 4670, 4765, 3780, 2410, 1340, 610, 230, 90, 35, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0], label='origin')
+            a4.plot(pw_stack, label='output power')
+            a4.set_title('load')   
+            a6 = plt.subplot2grid((4, 3), (1, 1))
+            a6.plot(rw_stack)
+            a6.set_title('reward per hour')
+            a7 = plt.subplot2grid((4, 3), (1, 2))
+            a7.set_ylim([-0.5, 2.5])
+            a7.plot(pc_stack)
+            a7.set_title('electricity price')
+            a8 = plt.subplot2grid((4, 3), (3, 0), colspan=3)
+            a8.plot(reward_temp)
+            a8.set_title('reward')
+            a9 = plt.subplot2grid((4, 3), (2, 0), colspan=2)
+            a9.plot(wt_stack)
+            a9.set_title('wait number')
+            aA = plt.subplot2grid((4, 3), (2, 2))
+            aA.plot(st_stack)
+            aA.set_title('storage unit')
+            aA.set_ylim([0, 4000])
+            fig.tight_layout()
+            fig.savefig('/public/home/zyc20000201/code/ddpg/1.png')
+            '''
+            print("储能装置", a0_stack)
+            print("充电补贴", a1_stack)
+            print("柴油机组", a2_stack)
+            print("输出电力", pw_stack)
+            print("车辆负荷", ev_stack)
+            print("电价", pc_stack)
+            '''
 
 if __name__ == '__main__':
-    train([1, 1, 1], 2000)
+    starttime = time.time()
+    train([1, 1, 1], 3000)
+    endtime = time.time()
+    print("time:", round(endtime - starttime, 2), "secs")

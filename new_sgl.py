@@ -13,21 +13,16 @@ import matplotlib.pyplot as plt
 
 class DieselEngine:
     def __init__(self):
-        self.max_output = 600
+        self.max_output = 3000
         self.min_output = 0
         self.crt_output = 0
-        self.max_climb  = 100
-        self.min_climb  = -100
+        self.max_climb  = 1000
+        self.min_climb  = -1000
         self.k_om       = 0.236 #运维系数
 
     def run(self, action):
-        p = (action + 1) / 2 * self.max_output
-        temp = p
-        if p - self.crt_output >= self.max_climb:
-            temp = self.crt_output + self.max_climb
-        elif self.crt_output - p <= self.min_climb:
-            temp = self.crt_output + self.min_climb
-        self.crt_output = temp
+        p = action * self.max_climb
+        self.crt_output = max(self.min_output, min(p + self.crt_output, self.max_output))
 
     def reset(self):
         self.crt_output = 0
