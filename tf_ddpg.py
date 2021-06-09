@@ -2,7 +2,7 @@
 Auther: Eurekwah
 Date: 1970-01-01 08:00:00
 LastEditors: Eurekwah
-LastEditTime: 2021-03-09 03:50:31
+LastEditTime: 2021-06-10 03:45:59
 FilePath: /code/tf_ddpg.py
 '''
 #coding=utf-8
@@ -23,7 +23,7 @@ import os
 import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import new_env as env
+import env as env
 
 
 # tf.compat.v1.disable_eager_execution()
@@ -349,14 +349,6 @@ def train(action_bound, episodes):
             aA.set_ylim([0, 4000])
             fig.tight_layout()
             fig.savefig('/public/home/zyc20000201/code/ddpg/1.png')
-            '''
-            print("储能装置", a0_stack)
-            print("充电补贴", a1_stack)
-            print("柴油机组", a2_stack)
-            print("输出电力", pw_stack)
-            print("车辆负荷", ev_stack)
-            print("电价", pc_stack)
-            '''
 
 if __name__ == '__main__':
     starttime = time.time()

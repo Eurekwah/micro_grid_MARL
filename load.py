@@ -46,12 +46,3 @@ class Load:
     def reset(self):
         self.wait_num = 0
         self.load = [0 for i in range(24)]
-
-if __name__ == "__main__":
-    a = Load()
-    load_stack = []
-    for i in range(24):
-        load, _, price, _ = a.step(0, i)
-        load_stack.append(load)
-    print(load_stack)
-    #plt.show()

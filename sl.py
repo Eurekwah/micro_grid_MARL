@@ -5,7 +5,6 @@ LastEditors: Eurekwah
 LastEditTime: 2021-02-21 01:20:09
 FilePath: /ddpg/new_sl.py
 '''
-# 储能装置 真实输出功率 剩余电量 为电网净负荷
 import numpy as np
 
 
@@ -13,7 +12,7 @@ class StorageUnit:
     def __init__(self, capacity):
         self.max_cap    = capacity  # kW
         self.capacity   = capacity
-        # 正放电负充电
+        # >0 discharge, <0 charge
         self.max_output = 1000
         self.min_output = -1000
         self.s_ev_max   = 0.95
@@ -35,7 +34,7 @@ class StorageUnit:
 
 
     def cost(self):
-        # 成本：系数✖功率>0
+        # cost = factor * power > 0
         return abs(self.crt_power) * self.k_om 
 
     def reset(self):

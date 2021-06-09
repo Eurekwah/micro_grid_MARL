@@ -18,7 +18,7 @@ class DieselEngine:
         self.crt_output = 0
         self.max_climb  = 1000
         self.min_climb  = -1000
-        self.k_om       = 0.236 #运维系数
+        self.k_om       = 0.236 # operational factor
 
     def run(self, action):
         p = action * self.max_climb
@@ -33,5 +33,3 @@ class DieselEngine:
         fuel_cost = 0.206 * self.crt_output
         total_cost = om_cost + env_cost + fuel_cost
         return total_cost
-
-# if __name__ == '__main__':
